@@ -3,6 +3,7 @@ from ultralytics import YOLO
 import tempfile
 from PIL import Image
 import os
+import time
 
 # Configuration de la page
 st.set_page_config(
@@ -126,7 +127,6 @@ def load_model(model_path):
     """Charge et cache le modèle YOLO"""
     try:
         model = YOLO(model_path)
-        st.success(f"Modèle chargé avec succès: {model_path}")
         return model
     except Exception as e:
         st.error(f"Erreur lors du chargement du modèle: {str(e)}")
@@ -188,20 +188,42 @@ with col2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<h3 class="sub-header" style="color: #1E3A8A;">🖼️ Image à Analyser</h3>', unsafe_allow_html=True)
     
-    # Upload de l'image
+    # Upload de l'image avec gestion améliorée
     uploaded_image = st.file_uploader(
         "**Téléchargez une image**", 
         type=["jpg", "jpeg", "png"],
         help="Importez une image contenant une ou plusieurs poubelles à analyser."
     )
     
-    if uploaded_image and model_path:
-        image = Image.open(uploaded_image)
-        st.image(image, caption="📸 Image importée", use_column_width=True)
-        
-        # Sauvegarde temporaire
-        temp_image_path = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg").name
-        image.save(temp_image_path)
+    if uploaded_image is not None and model_path:
+        with st.spinner("🔄 Chargement de l'image..."):
+            try:
+                # Vérification que le fichier est bien chargé
+                if uploaded_image.size > 0:
+                    # Petit délai pour stabiliser le chargement
+                    time.sleep(0.5)
+                    
+                    image = Image.open(uploaded_image)
+                    
+                    # Redimensionner si l'image est trop grande (optimisation)
+                    max_size = (800, 800)
+                    image.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    
+                    st.image(image, caption="📸 Image importée", use_column_width=True)
+                    
+                    # Sauvegarde temporaire
+                    temp_image_path = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg").name
+                    image.save(temp_image_path, "JPEG", quality=85)
+                    
+                    # Afficher un message de succès
+                    st.success(f"✅ Image chargée ({uploaded_image.size} bytes)")
+                    
+                else:
+                    st.error("❌ Le fichier image est vide")
+                    
+            except Exception as e:
+                st.error(f"❌ Erreur lors du chargement de l'image: {str(e)}")
+                st.info("💡 Essayez de réuploader l'image ou choisissez une image plus petite")
         
         # Bouton de prédiction
         predict_btn = st.button("🚀 Lancer l'Analyse", use_container_width=True)
@@ -274,15 +296,22 @@ with col2:
                             """, unsafe_allow_html=True)
                     
                     # Nettoyer les fichiers temporaires
-                    os.unlink(temp_image_path)
-                    if uploaded_model:
-                        os.unlink(temp_model_path)
+                    try:
+                        os.unlink(temp_image_path)
+                        if uploaded_model:
+                            os.unlink(temp_model_path)
+                    except:
+                        pass  # Ignorer les erreurs de nettoyage
                         
                 except Exception as e:
                     st.error(f"❌ Une erreur s'est produite lors de l'analyse : {str(e)}")
     
     elif uploaded_image and not model_path:
         st.warning("⚠️ Veuillez d'abord charger un modèle YOLO.")
+    
+    # Bouton de rafraîchissement
+    if st.button("🔄 Actualiser l'application", key="refresh"):
+        st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -299,3 +328,12 @@ st.markdown("""
 </div>
 </div>
 """, unsafe_allow_html=True)
+
+# Footer
+st.markdown("---")
+st.markdown(
+    '<div style="text-align: center; color: white; padding: 2rem;">'
+    '<p>🚀 Application de Détection Intelligente - Développée avec Streamlit</p>'
+    '</div>',
+    unsafe_allow_html=True
+)

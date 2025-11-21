@@ -6,6 +6,7 @@ import os
 import time
 import datetime
 
+
 # Configuration de la page
 st.set_page_config(
     page_title="Détection Poubelle Pleine/Vide",
@@ -18,7 +19,7 @@ st.set_page_config(
 def local_css():
     st.markdown("""
     <style>
-    /* Votre CSS existant */
+    /* Style global */
     .main {
         background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
         color: white;
@@ -28,6 +29,7 @@ def local_css():
         background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
     }
     
+    /* Headers */
     .main-header {
         font-size: 3rem;
         color: white;
@@ -44,6 +46,7 @@ def local_css():
         font-weight: 600;
     }
     
+    /* Boutons */
     .stButton>button {
         background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%);
         color: #1E3A8A;
@@ -62,6 +65,7 @@ def local_css():
         background: linear-gradient(135deg, #FFFFFF 0%, #F7FAFC 100%);
     }
     
+    /* Cartes et conteneurs */
     .card {
         background: rgba(255, 255, 255, 0.95);
         border-radius: 20px;
@@ -99,30 +103,20 @@ def local_css():
         color: #1E40AF;
     }
     
+    /* Responsive design */
     @media (max-width: 768px) {
         .main-header {
             font-size: 2rem;
         }
+        
         .sub-header {
             font-size: 1.2rem;
         }
+        
         .card {
             padding: 15px;
             margin: 10px 0;
         }
-    }
-    
-    /* Style spécial pour le file_uploader */
-    .stFileUploader > div > div {
-        border: 2px dashed #3B82F6 !important;
-        border-radius: 15px !important;
-        background: rgba(255, 255, 255, 0.9) !important;
-        padding: 20px !important;
-    }
-    
-    .stFileUploader > div > div:hover {
-        border-color: #1E40AF !important;
-        background: rgba(255, 255, 255, 1) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -140,28 +134,9 @@ def load_model(model_path):
         st.error(f"Erreur lors du chargement du modèle: {str(e)}")
         return None
 
-# === SOLUTION SIMPLIFIÉE POUR L'UPLOAD ===
-def check_app_ready():
-    """Vérifie si l'application est prête"""
-    if 'app_ready' not in st.session_state:
-        st.session_state.app_ready = False
-        # Petit délai initial pour le démarrage
-        time.sleep(2)
-        st.session_state.app_ready = True
-    return st.session_state.app_ready
-
 # Header principal
 st.markdown('<h1 class="main-header">🗑️ Détection Intelligente de Poubelles</h1>', unsafe_allow_html=True)
 st.markdown('<h3 style="text-align: center; color: white; margin-bottom: 3rem;">🔍 Analyse automatique : Poubelle Pleine ou Vide</h3>', unsafe_allow_html=True)
-
-# Vérification du statut de l'app
-if not check_app_ready():
-    st.warning("""
-    ⏳ **Initialisation de l'application en cours...**
-    
-    *Veuillez patienter quelques secondes que le backend se initialise complètement.*
-    """)
-    st.stop()
 
 # Introduction
 with st.container():
@@ -170,9 +145,9 @@ with st.container():
     <h4 style="color: #1E3A8A; margin-bottom: 1rem;">📋 Comment utiliser cette application :</h4>
     <div style="color: #4B5563;">
     <ol>
-        <li style="margin-bottom: 0.5rem;"><strong>Étape 1 :</strong> Téléchargez votre modèle YOLO (optionnel)</li>
-        <li style="margin-bottom: 0.5rem;"><strong>Étape 2 :</strong> Importez une image</li>
-        <li style="margin-bottom: 0.5rem;"><strong>Étape 3 :</strong> Lancez la détection</li>
+        <li style="margin-bottom: 0.5rem;"><strong>Étape 1 :</strong> Téléchargez votre modèle YOLO personnalisé (optionnel)</li>
+        <li style="margin-bottom: 0.5rem;"><strong>Étape 2 :</strong> Importez une image contenant une poubelle</li>
+        <li style="margin-bottom: 0.5rem;"><strong>Étape 3 :</strong> Lancez la détection et visualisez les résultats</li>
     </ol>
     </div>
     </div>
@@ -215,59 +190,50 @@ with col2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<h3 class="sub-header" style="color: #1E3A8A;">🖼️ Image à Analyser</h3>', unsafe_allow_html=True)
     
-    # ZONE UPLOAD AMÉLIORÉE
-    st.markdown("""
-    <div style="text-align: center; margin: 20px 0;">
-        <p style="color: #4B5563; font-size: 16px;">
-        📁 <strong>Glissez-déposez votre image ici OU cliquez pour parcourir</strong>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    # Upload de l'image avec gestion améliorée
     uploaded_image = st.file_uploader(
-        "**Sélectionner une image**", 
+        "**Téléchargez une image**", 
         type=["jpg", "jpeg", "png"],
-        help="Formats supportés: JPG, JPEG, PNG. Taille maximale recommandée: 10MB",
-        label_visibility="collapsed",
-        key="image_uploader"
+        help="Importez une image contenant une ou plusieurs poubelles à analyser."
     )
     
-    if uploaded_image is not None:
-        try:
-            # Vérification que le fichier est valide
-            if uploaded_image.size == 0:
-                st.error("❌ Le fichier est vide")
-            else:
-                with st.spinner("🔄 Chargement de l'image en cours..."):
-                    time.sleep(0.5)  # Petit délai pour stabilité
+    if uploaded_image is not None and model_path:
+        with st.spinner("🔄 Chargement de l'image..."):
+            try:
+                # Vérification que le fichier est bien chargé
+                if uploaded_image.size > 0:
+                    # Petit délai pour stabiliser le chargement
+                    time.sleep(0.5)
                     
                     image = Image.open(uploaded_image)
                     
-                    # Redimensionnement pour optimisation
+                    # Redimensionner si l'image est trop grande (optimisation)
                     max_size = (800, 800)
                     image.thumbnail(max_size, Image.Resampling.LANCZOS)
                     
-                    # Affichage de l'image
-                    st.image(image, caption="📸 Image importée avec succès", use_column_width=True)
+                    st.image(image, caption="📸 Image importée", use_column_width=True)
                     
                     # Sauvegarde temporaire
                     temp_image_path = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg").name
-                    image.save(temp_image_path, "JPEG", quality=90)
+                    image.save(temp_image_path, "JPEG", quality=85)
                     
-                    st.success(f"✅ Image chargée : {uploaded_image.name} ({uploaded_image.size // 1024} KB)")
+                    # Afficher un message de succès
+                    st.success(f"✅ Image chargée ({uploaded_image.size} bytes)")
                     
-        except Exception as e:
-            st.error(f"❌ Erreur lors du chargement : {str(e)}")
-            st.info("💡 Essayez une autre image ou un format différent")
-    
-    # Bouton de prédiction
-    if uploaded_image and model_path:
-        predict_btn = st.button("🚀 Lancer l'Analyse", use_container_width=True, type="primary")
+                else:
+                    st.error("❌ Le fichier image est vide")
+                    
+            except Exception as e:
+                st.error(f"❌ Erreur lors du chargement de l'image: {str(e)}")
+                st.info("💡 Essayez de réuploader l'image ou choisissez une image plus petite")
+        
+        # Bouton de prédiction
+        predict_btn = st.button("🚀 Lancer l'Analyse", use_container_width=True)
         
         if predict_btn:
-            with st.spinner("🔍 Analyse en cours... Cela peut prendre quelques secondes"):
+            with st.spinner("🔍 Analyse en cours... Veuillez patienter."):
                 try:
-                    # Charger le modèle
+                    # Charger le modèle (avec cache)
                     model = load_model(model_path)
                     
                     if model is not None:
@@ -289,6 +255,7 @@ with col2:
                             cls_id = int(boxes[0].cls[0])
                             cls_name = model.names[cls_id]
                             
+                            # Affichage stylisé selon le résultat
                             if "pleine" in cls_name.lower() or "full" in cls_name.lower():
                                 st.markdown(f"""
                                 <div class="warning-box">
@@ -306,60 +273,69 @@ with col2:
                                 </div>
                                 """, unsafe_allow_html=True)
                             
-                            # Statistiques
+                            # Statistiques supplémentaires
                             st.markdown('<h3 style="color: #1E3A8A;">📈 Statistiques de Détection</h3>', unsafe_allow_html=True)
                             col_stat1, col_stat2, col_stat3 = st.columns(3)
                             with col_stat1:
-                                st.metric("Objets détectés", len(boxes))
+                                st.metric("Nombre d'objets détectés", len(boxes))
                             with col_stat2:
                                 st.metric("Confiance moyenne", f"{boxes.conf.mean():.2f}" if len(boxes.conf) > 0 else "N/A")
                             with col_stat3:
-                                st.metric("Classe", cls_name)
+                                st.metric("Classe détectée", cls_name)
                                 
                         else:
                             st.markdown(f"""
                             <div class="info-box">
                             <h3 style="color: #1E40AF; margin-bottom: 1rem;">❌ Aucune Poubelle Détectée</h3>
-                            <p>Aucune poubelle détectée. Suggestions :</p>
+                            <p>Aucune poubelle n'a été détectée sur l'image fournie.</p>
+                            <p><strong>Suggestions :</strong></p>
                             <ul>
-                                <li>Image plus claire</li>
-                                <li>Poubelle bien visible</li>
-                                <li>Angle différent</li>
+                                <li>Vérifiez que l'image contient bien une poubelle</li>
+                                <li>Essayez avec une image plus claire</li>
+                                <li>Assurez-vous que la poubelle est bien visible</li>
                             </ul>
                             </div>
                             """, unsafe_allow_html=True)
                     
-                    # Nettoyage
+                    # Nettoyer les fichiers temporaires
                     try:
                         os.unlink(temp_image_path)
                         if uploaded_model:
                             os.unlink(temp_model_path)
                     except:
-                        pass
+                        pass  # Ignorer les erreurs de nettoyage
                         
                 except Exception as e:
-                    st.error(f"❌ Erreur lors de l'analyse : {str(e)}")
+                    st.error(f"❌ Une erreur s'est produite lors de l'analyse : {str(e)}")
     
     elif uploaded_image and not model_path:
         st.warning("⚠️ Veuillez d'abord charger un modèle YOLO.")
     
-    # Bouton de secours
-    st.markdown("---")
-    if st.button("🔄 Réinitialiser l'upload", key="reset_upload"):
+    # Bouton de rafraîchissement
+    if st.button("🔄 Actualiser l'application", key="refresh"):
         st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Section information
+# Section d'information
 st.markdown("---")
 st.markdown("### 💡 À propos de cette application")
 st.markdown("""
 <div class="card">
 <h4 style="color: #1E3A8A; margin-bottom: 1rem;">Technologie de Détection Intelligente</h4>
 <div style="color: #4B5563;">
-<p>Cette application utilise l'IA pour détecter automatiquement si une poubelle est pleine ou vide.</p>
-<p><strong>Technologies :</strong> YOLO pour la détection d'objets en temps réel.</p>
-<p><strong>Usage :</strong> Optimisation de la collecte des déchets.</p>
+<p>Cette application utilise l'intelligence artificielle pour détecter automatiquement si une poubelle est pleine ou vide.</p>
+<p><strong>Technologies utilisées :</strong> YOLO (You Only Look Once) pour la détection d'objets en temps réel.</p>
+<p><strong>Cas d'usage :</strong> Optimisation de la collecte des déchets, gestion intelligente des poubelles urbaines.</p>
 </div>
 </div>
 """, unsafe_allow_html=True)
+
+# Footer
+st.markdown("---")
+st.markdown(
+    '<div style="text-align: center; color: white; padding: 2rem;">'
+    '<p>🚀 Application de Détection Intelligente - Développée avec Streamlit</p>'
+    '</div>',
+    unsafe_allow_html=True
+)

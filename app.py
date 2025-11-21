@@ -4,6 +4,27 @@ import tempfile
 from PIL import Image
 import os
 import time
+import datetime
+
+# === DÉTECTION DE VEILLE ===
+if 'last_activity' not in st.session_state:
+    st.session_state.last_activity = datetime.datetime.now()
+
+# Vérifier si l'app est en veille
+current_time = datetime.datetime.now()
+time_diff = (current_time - st.session_state.last_activity).total_seconds()
+
+if time_diff > 3600:  # Si plus d'1h d'inactivité
+    st.warning("""
+    🔄 **L'application repart après une période de veille**
+    **Attendez 10-20 secondes que le backend redémarre...**
+    """)
+    # Forcer un petit délai pour laisser le temps au backend de redémarrer
+    time.sleep(3)
+    st.rerun()
+
+# Mettre à jour le timestamp d'activité
+st.session_state.last_activity = current_time
 
 # Configuration de la page
 st.set_page_config(

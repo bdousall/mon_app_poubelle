@@ -6,7 +6,6 @@ import os
 import time
 import datetime
 
-
 # Configuration de la page
 st.set_page_config(
     page_title="Détection Poubelle Pleine/Vide",
@@ -190,55 +189,50 @@ with col2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<h3 class="sub-header" style="color: #1E3A8A;">🖼️ Image à Analyser</h3>', unsafe_allow_html=True)
     
-    # Upload de l'image avec gestion améliorée
+    # Upload de l'image SIMPLIFIÉ
     uploaded_image = st.file_uploader(
         "**Téléchargez une image**", 
         type=["jpg", "jpeg", "png"],
-        help="Importez une image contenant une ou plusieurs poubelles à analyser."
+        help="Importez une image contenant une ou plusieurs poubelles à analyser.",
+        key="main_image_uploader"
     )
     
+    # VARIABLES GLOBALES pour stocker le chemin
+    if 'temp_image_path' not in st.session_state:
+        st.session_state.temp_image_path = None
+    
     if uploaded_image is not None and model_path:
-        with st.spinner("🔄 Chargement de l'image..."):
-            try:
-                # Vérification que le fichier est bien chargé
-                if uploaded_image.size > 0:
-                    # Petit délai pour stabiliser le chargement
-                    time.sleep(0.5)
-                    
-                    image = Image.open(uploaded_image)
-                    
-                    # Redimensionner si l'image est trop grande (optimisation)
-                    max_size = (800, 800)
-                    image.thumbnail(max_size, Image.Resampling.LANCZOS)
-                    
-                    st.image(image, caption="📸 Image importée", use_column_width=True)
-                    
-                    # Sauvegarde temporaire
-                    temp_image_path = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg").name
-                    image.save(temp_image_path, "JPEG", quality=85)
-                    
-                    # Afficher un message de succès
-                    st.success(f"✅ Image chargée ({uploaded_image.size} bytes)")
-                    
-                else:
-                    st.error("❌ Le fichier image est vide")
-                    
-            except Exception as e:
-                st.error(f"❌ Erreur lors du chargement de l'image: {str(e)}")
-                st.info("💡 Essayez de réuploader l'image ou choisissez une image plus petite")
+        try:
+            # Vérification rapide
+            if uploaded_image.size > 0:
+                # Afficher IMMÉDIATEMENT l'image
+                image = Image.open(uploaded_image)
+                st.image(image, caption="📸 Image importée", use_column_width=True)
+                
+                # Sauvegarde temporaire (en arrière-plan)
+                st.session_state.temp_image_path = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg").name
+                image.save(st.session_state.temp_image_path, "JPEG", quality=85)
+                
+                st.success(f"✅ Image prête pour l'analyse")
+                
+            else:
+                st.error("❌ Le fichier image est vide")
+                
+        except Exception as e:
+            st.error(f"❌ Erreur lors du chargement: {str(e)}")
         
         # Bouton de prédiction
-        predict_btn = st.button("🚀 Lancer l'Analyse", use_container_width=True)
+        predict_btn = st.button("🚀 Lancer l'Analyse", use_container_width=True, type="primary")
         
-        if predict_btn:
+        if predict_btn and st.session_state.temp_image_path:
             with st.spinner("🔍 Analyse en cours... Veuillez patienter."):
                 try:
-                    # Charger le modèle (avec cache)
+                    # Charger le modèle
                     model = load_model(model_path)
                     
                     if model is not None:
                         # Effectuer la prédiction
-                        results = model(temp_image_path)
+                        results = model(st.session_state.temp_image_path)
                         
                         # Afficher les résultats
                         result_image = results[0].plot()
@@ -299,20 +293,23 @@ with col2:
                     
                     # Nettoyer les fichiers temporaires
                     try:
-                        os.unlink(temp_image_path)
-                        if uploaded_model:
+                        if st.session_state.temp_image_path and os.path.exists(st.session_state.temp_image_path):
+                            os.unlink(st.session_state.temp_image_path)
+                            st.session_state.temp_image_path = None
+                        if uploaded_model and 'temp_model_path' in locals():
                             os.unlink(temp_model_path)
                     except:
-                        pass  # Ignorer les erreurs de nettoyage
+                        pass
                         
                 except Exception as e:
-                    st.error(f"❌ Une erreur s'est produite lors de l'analyse : {str(e)}")
+                    st.error(f"❌ Erreur lors de l'analyse : {str(e)}")
     
     elif uploaded_image and not model_path:
         st.warning("⚠️ Veuillez d'abord charger un modèle YOLO.")
     
-    # Bouton de rafraîchissement
-    if st.button("🔄 Actualiser l'application", key="refresh"):
+    # Bouton de réinitialisation
+    if st.button("🔄 Nouvelle image", key="new_image"):
+        st.session_state.temp_image_path = None
         st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
